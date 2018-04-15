@@ -1,73 +1,22 @@
-const webpage = require('webpage');
-const fs = require('fs');
-const waitFor = require('./waitfor');
+const path = require('path');
+// const spawn = require('child_process').spawn;
+const childProcess = require('child_process');
+const phantomjs = require('phantomjs-prebuilt');
+const binPath = phantomjs.path;
+// const process = require('./process_polyfill');
 
-const page = webpage.create();
-const userAgent =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36';
+const childArgs = [path.join(__dirname, './segment.js'), 'acc'];
+const program = phantomjs.exec(path.join(__dirname, './segment.js'), 'acc');
 
-const getSegment = argv => {
-  if (!argv) throw Error('no argument provided');
-  if (argv.length === 1) throw Error('no segment argument provided');
-  if (argv.length === 2) {
-    return argv[1];
-  } else {
-    throw Error('arguments format invalid');
-  }
-};
+// process = spawn(binPath, childArgs);
+program.stdout.setEncoding('utf8');
+program.stdout.on('data', data => {
+  console.log(data);
+});
+program.stderr.on('data', data => {
+  console.log('stderr:' + data);
+});
 
-const getSelectedText = id => {
-  var elem = document.getElementById(id);
-  if (elem.selectedIndex == -1) return null;
-  return elem.options[elem.selectedIndex].text;
-};
-
-const caristixUrl = 'http://hl7-definition.caristix.com:9010/';
-page.settings.userAgent = userAgent;
-
-const _arg = getSegment(process.argv);
-const selector = 'cbxSegment';
-// https://stackoverflow.com/questions/32771609/how-to-click-on-selectbox-options-using-phantomjs
-const selectOptions = (selector, segmentArg) => {
-  page.evaluate(
-    function(selector, segmentArg) {
-      // assign select option with segment value
-      const sel = document.getElementById(selector);
-      sel.value = segmentArg;
-      // fire onChange event
-      const event = new UIEvent('change', {
-        view: window,
-        bubbles: true,
-        cancelable: true
-      });
-      sel.dispatchEvent(event);
-    },
-    selector,
-    _arg
-  );
-};
-// page.open(caristixUrl, function(status) {
-//   if (status == 'success') {
-//     setTimeout(function() {
-//       page.evaluate(function(_arg) {
-//         document.getElementById('cbxSegment').value = _arg;
-//       }, segmentArgs(process.argv));
-//     }, 2000);
-//   }
-// });
-
-page.open(caristixUrl, status => {
-  if (status !== 'success') throw Error('Unable to access network');
-  selectOptions('cbxSegment', getSegment(process.argv));
-  waitFor(
-    () => {
-      return page.evaluate(() => {
-        return $('#grdResult').is(':visible');
-      });
-    },
-    () => {
-      console.log('The result table is now visible');
-      phantom.exit();
-    }
-  );
+program.on('exit', code => {
+  console.log('phantomjs-child process existed with code', code);
 });
